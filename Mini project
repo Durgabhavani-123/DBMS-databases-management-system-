@@ -1,0 +1,234 @@
+
+MINI PRIJECT,,,,,
+
+Identify entities such as students, exams, questions, and results
+
+Entity	Attributes	Description
+
+Student	Student_ID (PK), Name, Email, Course, Department, Password	Stores student information.
+Exam	Exam_ID (PK), Exam_Name, Subject, Date, Duration, Total_Marks	Contains details of each exam.
+Question	Question_ID (PK), Exam_ID (FK), Question_Text, Option_A, Option_B, Option_C, Option_D, Correct_Answer, Marks	Stores all questions and options for each exam.
+Result	Result_ID (PK), Student_ID (FK), Exam_ID (FK), Score, Percentage, Grade, Rank	Contains marks and ranking details after exam evaluation.
+Submission (optional)	Submission_ID (PK), Student_ID (FK), Question_ID (FK), Answer_Selected, Is_Correct	Tracks answers submitted during exams.
+
+
+Relationships:
+
+One Student → can appear in many Exams.
+
+One Exam → can have many Questions.
+
+One Student → can have many Results (one per exam).
+
+One Result → corresponds to one Exam for one Student.
+
+
+
+---
+
+ Normalize the relations to reduce redundancy
+
+Step 1: Unnormalized Form (UNF)
+
+Initially, we might have one big table:
+
+| Student_ID | Name | Exam_Name | Question_Text | Answer_Selected | Correct_Answer | Score |
+
+→ Data redundancy: student and exam info repeated for each question.
+
+
+---
+
+Step 2: 1NF
+
+Ensure atomicity — split repeating groups into separate tables:
+
+Student(Student_ID, Name, Email, Course, Department)
+
+Exam(Exam_ID, Exam_Name, Subject, Date, Duration, Total_Marks)
+
+Question(Question_ID, Exam_ID, Question_Text, Options, Correct_Answer, Marks)
+
+Result(Result_ID, Student_ID, Exam_ID, Score, Grade, Rank)
+
+
+
+---
+
+Step 3: 2NF
+
+Remove partial dependencies — all non-key attributes depend on the full primary key.
+
+For example:
+
+In Result, Score depends on the combination of (Student_ID, Exam_ID), not partially.
+
+
+
+---
+
+Step 4: 3NF
+
+Remove transitive dependencies — non-key attributes shouldn’t depend on other non-key attributes.
+
+For example:
+
+In Student, Course → Department (transitive), so create a new table:
+
+
+Course(Course_ID, Course_Name, Department)
+and reference it from Student.
+
+
+---
+
+Functional Dependencies
+
+Student_ID → Name, Email, Course
+
+Exam_ID → Exam_Name, Subject, Duration
+
+Question_ID → Question_Text, Correct_Answer, Marks
+
+(Student_ID, Exam_ID) → Score, Grade
+
+
+✅ Final schema is in 3rd Normal Form (3NF) with minimal redundancy.
+
+
+---
+
+ Write SQL queries to retrieve scores and rank students by performance
+
+a) Retrieve total score of each student
+
+SELECT S.Student_ID, S.Name, E.Exam_Name, R.Score
+FROM Student S
+JOIN Result R ON S.Student_ID = R.Student_ID
+JOIN Exam E ON R.Exam_ID = E.Exam_ID;
+
+
+---
+
+b) Rank students based on performance
+
+SELECT 
+  Student_ID,
+  Exam_ID,
+  Score,
+  RANK() OVER (PARTITION BY Exam_ID ORDER BY Score DESC) AS Rank
+FROM Result;
+
+
+---
+
+c) Retrieve top 3 students in a specific exam
+
+SELECT S.Name, R.Score
+FROM Result R
+JOIN Student S ON R.Student_ID = S.Student_ID
+WHERE R.Exam_ID = 'EX101'
+ORDER BY R.Score DESC
+LIMIT 3;
+
+
+---
+
+d) Calculate average score of each exam
+
+SELECT E.Exam_Name, AVG(R.Score) AS Average_Score
+FROM Result R
+JOIN Exam E ON R.Exam_ID = E.Exam_ID
+GROUP BY E.Exam_Name;
+
+
+---
+
+ Discuss how ACID properties are maintained during online submissions
+
+Property	Meaning	Implementation in Online Exam System
+
+A – Atomicity	All operations in a transaction are completed or none are.	During submission, either all answers and scores are recorded or none (using database transactions).
+C – Consistency	Database must remain in a valid state before and after transaction.	Each submission updates results only if exam and student IDs are valid. Constraints and foreign keys ensure consistency.
+I – Isolation	Transactions are executed independently.	Multiple students can submit simultaneously without interfering — handled via isolation levels (e.g., READ COMMITTED).
+D – Durability	Once committed, data is permanently saved.	After submission, data (answers, scores) is written to persistent storage (e.g., transaction logs or journal).
+
+
+Example (SQL Transaction):
+
+BEGIN TRANSACTION;
+
+INSERT INTO Submission (Student_ID, Question_ID, Answer_Selected, Is_Correct)
+VALUES (102, 501, 'A', TRUE);
+
+UPDATE Result
+SET Score = Score + 2
+WHERE Student_ID = 102 AND Exam_ID = 'EX101';
+
+COMMIT;
+
+If an error occurs → ROLLBACK; ensures atomicity and consistency.
+
+
+---
+
+ Perform CRUD operations using MongoDB for exam results
+
+Collection: exam_results
+
+a) Create (Insert)
+
+db.exam_results.insertOne({
+  student_id: "S101",
+  name: "Durga Singireddy",
+  exam_id: "EX101",
+  subject: "Database Systems",
+  score: 92,
+  grade: "A+",
+  date: new Date("2025-10-20")
+});
+
+b) Read (Retrieve)
+
+db.exam_results.find({ exam_id: "EX101" });
+
+c) Update (Modify)
+
+db.exam_results.updateOne(
+  { student_id: "S101", exam_id: "EX101" },
+  { $set: { score: 95, grade: "A+" } }
+);
+
+d) Delete (Remove)
+
+db.exam_results.deleteOne({ student_id: "S101", exam_id: "EX101" });
+
+e) Retrieve Top Performers
+
+db.exam_results.find().sort({ score: -1 }).limit(5);
+
+
+---
+
+✅ Summary Table
+
+Q. No.	Topic	Key Concept
+
+6	Entity Identification	Defined Student, Exam, Question, Result, Submission
+7	Normalization	Up to 3NF with functional dependencies
+8	SQL Queries	Rank, Score retrieval, Top performers
+9	ACID Properties	Atomicity, Consistency, Isolation, Durability
+10	MongoDB CRUD	Create, Read, Update, Delete for results
+
+
+
+---
+
+Conclusion
+
+A normalized relational schema efficiently manages student exam data, while MongoDB offers flexibility for storing and processing large, dynamic result datasets.
+Together, they ensure data consistency, reliability, and high performance for online exam systems.
+
+
+
+
