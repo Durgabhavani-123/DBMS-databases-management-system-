@@ -1,0 +1,266 @@
+Excellent — you’re referring to Use Case 3: Gift Coupon Application (Transaction Management & Normalization) from your Database Management Systems (DBMS) lab.
+
+Below is a ready-to-submit lab note version — written clearly, with technical accuracy and proper formatting for a DBMS lab record (CO1–CO5 outcomes).
+
+
+--
+
+
+
+Experiment: Use Case 3 – Gift Coupon Application Using Relational Database
+
+
+---
+
+Objective
+
+To design a gift coupon application using a relational database that maintains ACID properties, supports horizontal scalability, and ensures normalized relational tables to prevent data redundancy and deadlocks during concurrent transactions.
+
+
+---
+
+Theory
+
+Background
+
+A gift coupon application processes:
+
+Coupon generation and validation,
+
+Payment and redemption transactions,
+
+User and merchant interactions, and
+
+Audit logging for each transaction.
+
+
+Such operations involve sensitive financial data, so strong consistency (ACID) is mandatory.
+Eventual consistency (used in some NoSQL databases) would not be suitable because payment operations require immediate and reliable consistency.
+
+
+---
+
+Choice of Database System
+
+Requirement	Chosen Database	Justification
+
+Transaction integrity (ACID)	Relational DBMS (MySQL/PostgreSQL)	Ensures atomic and consistent transactions.
+Horizontal scalability	Clustered RDBMS (e.g., MySQL Cluster, PostgreSQL Citus)	Supports large-scale read/write workloads.
+High availability	Cluster replication	Ensures redundancy and failover.
+Normalization	Up to 3NF or BCNF	Reduces redundancy and avoids anomalies.
+
+
+
+---
+
+Entities and Attributes
+
+Entity	Attributes	Description
+
+User	User_ID (PK), Name, Email, Phone, Wallet_Balance	Customer using coupons.
+Merchant	Merchant_ID (PK), Name, Category, Contact	Business providing coupon offers.
+Coupon	Coupon_ID (PK), Code, Discount, Expiry_Date, Status	Defines a coupon and its offer.
+Transaction	Transaction_ID (PK), User_ID (FK), Coupon_ID (FK), Merchant_ID (FK), Transaction_Date, Amount, Payment_Status	Records coupon redemption/payment.
+Payment	Payment_ID (PK), Transaction_ID (FK), Payment_Method, Payment_Amount, Payment_Status	Logs details of payment processing.
+
+
+
+---
+
+Relationships
+
+User ↔ Transaction → One-to-many
+
+Merchant ↔ Coupon → One-to-many
+
+Coupon ↔ Transaction → One-to-many
+
+Transaction ↔ Payment → One-to-one
+
+
+
+---
+
+Normalization Process
+
+Step 1 – Unnormalized Form (UNF)
+
+Initially, all coupon, user, and transaction details may exist in one large table:
+
+| User_ID | User_Name | Coupon_Code | Merchant_Name | Amount | Payment_Status |
+
+This leads to data duplication and update anomalies.
+
+
+---
+
+Step 2 – 1st Normal Form (1NF)
+
+Each attribute contains only atomic values.
+
+Separate tables for User, Coupon, Merchant, Transaction, and Payment.
+
+
+
+---
+
+Step 3 – 2nd Normal Form (2NF)
+
+Remove partial dependencies:
+Each non-key attribute depends on the whole primary key.
+
+
+Example:
+
+In Transaction, Transaction_Date depends on Transaction_ID, not partially on Coupon_ID or User_ID.
+
+
+
+---
+
+Step 4 – 3rd Normal Form (3NF)
+
+Remove transitive dependencies: Non-key attributes should not depend on other non-key attributes.
+
+
+Example:
+
+If Merchant_Category depends on Merchant_Name, move it to Merchant table.
+
+
+
+---
+
+Step 5 – Boyce–Codd Normal Form (BCNF)
+
+Every determinant must be a candidate key.
+
+Ensures maximum normalization for large-scale, concurrent transactions.
+
+
+✅ The Gift Coupon Application can sustain up to BCNF without data loss or performance issues.
+
+
+---
+
+SQL Schema Example
+
+CREATE TABLE User (
+  User_ID INT PRIMARY KEY,
+  Name VARCHAR(50),
+  Email VARCHAR(100) UNIQUE,
+  Phone VARCHAR(15),
+  Wallet_Balance DECIMAL(10,2)
+);
+
+CREATE TABLE Merchant (
+  Merchant_ID INT PRIMARY KEY,
+  Name VARCHAR(50),
+  Category VARCHAR(50),
+  Contact VARCHAR(100)
+);
+
+CREATE TABLE Coupon (
+  Coupon_ID INT PRIMARY KEY,
+  Code VARCHAR(20) UNIQUE,
+  Discount DECIMAL(5,2),
+  Expiry_Date DATE,
+  Status VARCHAR(20)
+);
+
+CREATE TABLE Transaction (
+  Transaction_ID INT PRIMARY KEY,
+  User_ID INT,
+  Coupon_ID INT,
+  Merchant_ID INT,
+  Transaction_Date TIMESTAMP,
+  Amount DECIMAL(10,2),
+  Payment_Status VARCHAR(20),
+  FOREIGN KEY (User_ID) REFERENCES User(User_ID),
+  FOREIGN KEY (Coupon_ID) REFERENCES Coupon(Coupon_ID),
+  FOREIGN KEY (Merchant_ID) REFERENCES Merchant(Merchant_ID)
+);
+
+CREATE TABLE Payment (
+  Payment_ID INT PRIMARY KEY,
+  Transaction_ID INT,
+  Payment_Method VARCHAR(20),
+  Payment_Amount DECIMAL(10,2),
+  Payment_Status VARCHAR(20),
+  FOREIGN KEY (Transaction_ID) REFERENCES Transaction(Transaction_ID)
+);
+
+
+---
+
+Transaction Example (ACID Property Demonstration)
+
+BEGIN TRANSACTION;
+
+UPDATE Coupon
+SET Status = 'Redeemed'
+WHERE Coupon_ID = 501;
+
+INSERT INTO Transaction (Transaction_ID, User_ID, Coupon_ID, Merchant_ID, Transaction_Date, Amount, Payment_Status)
+VALUES (9001, 101, 501, 201, NOW(), 500.00, 'Success');
+
+UPDATE User
+SET Wallet_Balance = Wallet_Balance - 500.00
+WHERE User_ID = 101;
+
+COMMIT;
+
+If any step fails → ROLLBACK; ensures Atomicity and Consistency.
+
+
+---
+
+Concurrency and Deadlock Prevention
+
+Technique	Description
+
+Lock Ordering	Always acquire locks in the same order (e.g., User → Coupon → Transaction).
+Short Transactions	Keep transactions short to minimize lock duration.
+Deadlock Detection	Use RDBMS engine’s deadlock detection (MySQL/PostgreSQL automatically rollbacks one of the conflicting transactions).
+Optimistic Concurrency	Use version control or timestamps to reduce locking conflicts.
+
+
+With normalized tables and ACID transactions, deadlocks are minimized and data integrity is maintained.
+
+
+---
+
+Observation
+
+Horizontal scaling via MySQL Cluster/PostgreSQL Citus allows high-volume transactions.
+
+ACID properties guarantee reliable coupon redemption and payment processing.
+
+Up to BCNF normalization removes redundancy and prevents anomalies.
+
+
+
+---
+
+Result
+
+Successfully designed a relational database schema for the gift coupon application that:
+
+Maintains ACID properties,
+
+Supports horizontal scalability, and
+
+Achieves BCNF normalization to eliminate redundancy and avoid deadlocks.
+
+
+
+---
+
+Conclusion
+
+The gift coupon application performs reliably under high concurrency when implemented using a clustered relational database (e.g., MySQL Cluster or PostgreSQL).
+Normalization up to BCNF ensures minimal redundancy, while ACID-compliant transactions maintain data consistency and prevent deadlocks.
+
+
+
+
